@@ -82,12 +82,32 @@ The bank is experiencing a ~20% annual customer churn rate. Retention efforts to
 | Card Type | Not stated as predictive | **No effect** — churn rate nearly identical across all card types (19.3–21.8%) |
 | Satisfaction Score | Post-event field | **No effect** — flat across all scores (19.6–21.8%), consistent with it being a narrow post-complaint metric, not a general health indicator |
 | IsActiveMember | Active = more loyal | **Confirmed** — negative correlation with churn (-0.16); active members churn less |
+| Geography | Exploratory | **Real effect** — Germany churns notably higher (~32.4%) than Spain (~16.7%) and France (~16.2%) |
+| Gender | Exploratory | **Real effect** — Female customers churn more (~25.1%) than Male customers (~16.5%) |
+
+### Geography and Gender
+
+- **Geography:** Germany has notably higher churn (~32.4%) than Spain (~16.7%) or France (~16.2%) — roughly double. Worth investigating further in a real setting (e.g., product fit, local competition, service quality), though outside the scope of this dataset.
+- **Gender:** Female customers churn at a higher rate (~25.1%) than Male customers (~16.5%). A meaningful gap, though the underlying cause isn't available in this dataset.
+
+Both variables were flagged as "exploratory" in the original data dictionary rather than assumed predictors, and both turned out to show a real, non-trivial difference in churn rate — unlike several of the variables the dictionary *did* assume would matter (Tenure, CreditScore, Card Type).
 
 ### Key Finding: Non-Linear Effect of Number of Products
 
 Churn rate by `NumOfProducts`: 1 product → 27%, 2 products → ~7% (lowest), 3 products → ~82%, 4 products → ~100%.
 
-This is a U-shaped, non-linear pattern, not a straight-line relationship. Two-product customers appear to be the most loyal segment, while customers holding 3 or more products represent a sharply higher-risk group — possibly linked to over-selling, dissatisfaction-driven multi-product acquisition, or a small, unusual sample size in the higher-count buckets (to be confirmed via segment sizes). This is one of the strongest and most actionable findings in the dataset.
+This is a U-shaped, non-linear pattern, not a straight-line relationship. Two-product customers appear to be the most loyal segment, while customers holding 3 or more products represent a sharply higher-risk group.
+
+**Segment sizes (checked via `value_counts()`):**
+
+| NumOfProducts | Customer Count | % of Total |
+|---|---|---|
+| 1 | 5,084 | 50.8% |
+| 2 | 4,590 | 45.9% |
+| 3 | 266 | 2.7% |
+| 4 | 60 | 0.6% |
+
+The 1- and 2-product comparison (96.7% of customers combined) is based on large samples and is solid. The 3- and 4-product churn rates (~82% and ~100%) are directionally real and worth flagging, but rest on much smaller groups (266 and 60 customers respectively) — the 100% figure in particular is fragile, since a handful of retained customers in that group of 60 would shift it noticeably. This is still one of the strongest and most actionable patterns in the dataset, but the confidence in the extreme end of it should be stated proportionally to sample size.
 
 ### Data Leakage: `Complain` and `Satisfaction Score`
 
