@@ -140,9 +140,63 @@ From the correlation heatmap against `Exited`:
 
 ---
 
+## Step 4: Statistical Validation
+
+**What:** Formally tested whether the patterns found in EDA are statistically significant, using chi-square tests for categorical variables (Geography, Gender, NumOfProducts, HasCrCard, IsActiveMember, Card Type, Satisfaction Score, Complain) and Welch's t-tests for numeric variables (Age, Tenure, Balance, CreditScore, EstimatedSalary), each against `Exited`.
+
+**Why:** Visual patterns from EDA can be misleading — some may be random noise, others (like the small `NumOfProducts` 3–4 segments) needed confirmation that the pattern holds up formally despite smaller sample sizes. This step also distinguishes **statistical significance** from **practical significance** — with 10,000 rows, even trivially small differences can register as "significant," so effect size still matters alongside the p-value.
+
+**How/where:** Python (`scipy.stats` — `chi2_contingency`, `ttest_ind`)
+
+### Chi-Square Results (Categorical Variables)
+
+| Variable | Chi2 | p-value | Significant? |
+|---|---|---|---|
+| Geography | 300.63 | 5.2×10⁻⁶⁶ | Yes |
+| Gender | 112.40 | 2.9×10⁻²⁶ | Yes |
+| NumOfProducts | 1501.50 | ~0.0 | Yes — strongest relationship in the dataset |
+| HasCrCard | 0.45 | 0.503 | No |
+| IsActiveMember | 243.69 | 6.2×10⁻⁵⁵ | Yes |
+| Card Type | 5.05 | 0.168 | No |
+| Satisfaction Score | 3.80 | 0.434 | No |
+| Complain | 9907.91 | ~0.0 | Yes — extreme; confirms leakage numerically |
+
+### T-Test Results (Numeric Variables)
+
+| Variable | t-stat | p-value | Significant? |
+|---|---|---|---|
+| Age | 30.42 | 4.4×10⁻¹⁷⁹ | Yes |
+| Tenure | -1.35 | 0.177 | No |
+| Balance | 12.48 | 5.8×10⁻³⁵ | Yes |
+| CreditScore | -2.60 | 0.0093 | Statistically yes, practically negligible (see note) |
+| EstimatedSalary | 1.24 | 0.214 | No |
+
+**Note on CreditScore:** Although p=0.0093 clears the standard significance threshold, the actual effect size is small — mean CreditScore is ~652 (retained) vs ~645 (churned), a ~7-point gap on an 850-point scale. With a sample of 10,000, even minor differences can produce a low p-value. This is a case where **statistical significance does not imply practical significance** — the gap is too small to be a useful signal for identifying at-risk customers in practice.
+
+### Final Driver Verdict
+
+| Variable | Statistically Significant? | Practically Meaningful? |
+|---|---|---|
+| Age | Yes | Yes — strong driver |
+| Balance | Yes | Yes — meaningful, counter-intuitive direction |
+| Geography | Yes | Yes — Germany ~2x higher churn |
+| Gender | Yes | Yes — meaningful gap |
+| NumOfProducts | Yes (strongest overall) | Yes — most actionable finding |
+| IsActiveMember | Yes | Yes — real protective effect |
+| CreditScore | Yes (p=0.009) | **No** — effect size negligible (~7 points) |
+| Tenure | No | No |
+| EstimatedSalary | No | No |
+| HasCrCard | No | No |
+| Card Type | No | No |
+| Satisfaction Score | No | No |
+| Complain | Yes (extreme) | Leakage — excluded from modeling |
+
+**Conclusion:** Age, Balance, Geography, Gender, NumOfProducts, and IsActiveMember are confirmed as genuine, statistically-backed churn drivers and will carry the most weight in modeling (Step 7). Tenure, EstimatedSalary, HasCrCard, Card Type, and Satisfaction Score are confirmed as non-drivers and can be deprioritized or dropped. CreditScore is a borderline case, statistically detectable but practically weak. `Complain` is definitively confirmed as leakage and will be excluded from the realistic model.
+
+---
+
 ## Next Steps
 
-- **Step 4:** Statistical validation (chi-square, t-tests) to confirm which patterns above are statistically significant
 - **Step 5:** SQL-based analysis (churn by geography, cohort/tenure analysis)
 - **Step 6:** Customer segmentation (clustering)
 - **Step 7:** Predictive modeling (with and without leakage fields)
