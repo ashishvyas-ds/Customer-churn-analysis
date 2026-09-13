@@ -195,9 +195,59 @@ From the correlation heatmap against `Exited`:
 
 ---
 
+## Step 5: SQL-Based Analysis
+
+**What:** Loaded the dataset into a local SQLite database and answered analytical questions directly in SQL — churn by geography, a tenure cohort check, a combined geography × gender breakdown, a within-segment ranking using a window function, and a reusable risk-segment definition using CASE WHEN.
+
+**Why:** In a real environment, the data usually already lives in a database, and initial slicing/aggregation happens in SQL before anything is pulled into Python. This step also tests whether patterns hold up under simple aggregate queries, and pushes past single-variable EDA into combined segments, which is where some of the sharpest insights in this project were found.
+
+**How/where:** Python's built-in `sqlite3` + `pandas.read_sql()`
+
+### Churn by Geography (confirms EDA/Stats)
+
+| Geography | Customers | Churned | Churn Rate |
+|---|---|---|---|
+| Germany | 2,509 | 814 | 32.44% |
+| Spain | 2,477 | 413 | 16.67% |
+| France | 5,014 | 811 | 16.17% |
+
+### Churn by Tenure (confirms flat/no relationship)
+
+Churn rate stays within a 17–23% band across all tenure values (0–10 years), consistent with the statistical finding that Tenure is not a significant driver (p=0.177).
+
+### Key Finding: Geography × Gender Interaction
+
+| Geography | Gender | Customers | Churn Rate |
+|---|---|---|---|
+| Germany | Female | 1,193 | **37.55%** |
+| Germany | Male | 1,316 | 27.81% |
+| Spain | Female | 1,089 | 21.21% |
+| France | Female | 2,261 | 20.34% |
+| Spain | Male | 1,388 | 13.11% |
+| France | Male | 2,753 | **12.75%** |
+
+Geography and Gender don't act independently — they compound. **German women churn at nearly 3x the rate of French or Spanish men** (37.55% vs 12.75%). Neither the Geography-only nor Gender-only view captures this gap on its own; it only appears once the two variables are combined. This is a sharper, more actionable segment than either variable alone and a strong candidate for the highest-priority retention outreach group.
+
+### Balance Ranking Within Geography (window function)
+
+Used `RANK() OVER (PARTITION BY Geography ORDER BY Balance DESC)` to rank customers by balance within each country. Spot-checking the top 15 France customers by balance: 8 of the 15 had already churned — consistent with the earlier finding that a high balance does not protect against churn in this dataset; if anything, the opposite.
+
+### Risk Segmentation via CASE WHEN
+
+Operationalized the `NumOfProducts` finding (Steps 3–4) into three named risk tiers:
+
+| Risk Segment | Customers | Churn Rate |
+|---|---|---|
+| High Risk (3–4 products) | 326 | 85.89% |
+| Medium Risk (1 product) | 5,084 | 27.71% |
+| Low Risk (2 products) | 4,590 | 7.60% |
+
+This mirrors how a retention team would realistically consume this finding — not as a chart, but as a simple, queryable rule that flags customers directly. This segmentation logic carries forward conceptually into Step 6 (clustering) and Step 10 (risk tiering).
+
+---
+
 ## Next Steps
 
-- **Step 5:** SQL-based analysis (churn by geography, cohort/tenure analysis)
 - **Step 6:** Customer segmentation (clustering)
 - **Step 7:** Predictive modeling (with and without leakage fields)
 - **Step 8–9:** Evaluation and explainability (SHAP)
