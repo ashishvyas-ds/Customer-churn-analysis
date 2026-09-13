@@ -273,8 +273,41 @@ This mirrors how a retention team would realistically consume this finding — n
 
 ---
 
+## Step 7: Predictive Modeling
+
+**What:** Built two Random Forest models (class-weighted to handle the ~20% churn imbalance) on the same train/test split, to make the leakage effect concrete rather than theoretical:
+- **Leaky model:** includes `Complain` and `Satisfaction Score`
+- **Realistic model:** excludes both — uses only signals available *before* a customer shows distress (CreditScore, Geography, Gender, Age, Tenure, Balance, NumOfProducts, HasCrCard, IsActiveMember, EstimatedSalary)
+
+**Why:** Rather than just asserting leakage should be excluded (Steps 3-4), training both models side by side makes the effect visible and undeniable — the leaky model's implausibly perfect score is direct proof that it's referencing the outcome rather than predicting it.
+
+**How/where:** Python (`scikit-learn` — `RandomForestClassifier`, `class_weight='balanced'`)
+
+### Results
+
+| Metric | Leaky Model (incl. Complain) | Realistic Model |
+|---|---|---|
+| Accuracy | 1.00 | 0.84 |
+| Precision (Churn class) | 1.00 | 0.60 |
+| Recall (Churn class) | 1.00 | 0.59 |
+| ROC-AUC | 0.999 | **0.861** |
+
+**Leaky model:** near-perfect across every metric. In the real world, no model is ever this good — human churn behavior is inherently noisy. This result is not a sign of a good model; it's a sign that `Complain` (already shown in Steps 3-4 to be a near-duplicate of `Exited`) is letting the model reference the answer rather than predict it. This model is not usable in production — by the time a customer has complained, it's generally too late to prevent churn.
+
+**Realistic model:** ROC-AUC of 0.861 is a genuinely solid, credible result for a real-world churn model, predicting entirely from information available *before* a customer shows any sign of distress. Accuracy (0.84) is not the meaningful number here, since a model that always predicted "no churn" would already score 0.80 on this imbalanced dataset — precision, recall, and AUC on the churn class are what matter.
+
+### Confusion Matrix — Realistic Model (2,000 test customers)
+
+| | Predicted: Stay | Predicted: Churn |
+|---|---|---|
+| **Actual: Stay** | 1,430 | 162 (false alarm) |
+| **Actual: Churn** | 166 (missed) | 242 (correctly caught) |
+
+**In business terms:** of the 408 customers in the test set who actually churned, the model correctly flagged 242 of them (59%) in advance — giving the retention team a genuine window to intervene with over half of at-risk customers, versus zero visibility today. The 162 false alarms carry a low cost (an unnecessary retention offer to a loyal customer); the 166 missed cases are the model's real limitation, but going from no early warning to catching ~6 in 10 at-risk customers is a substantial, actionable improvement over the current reactive state. This confusion matrix directly feeds the cost/benefit framing in Step 10.
+
+---
+
 ## Next Steps
 
-- **Step 7:** Predictive modeling (with and without leakage fields)
 - **Step 8–9:** Evaluation and explainability (SHAP)
 - **Step 10:** Business translation and risk tiering
