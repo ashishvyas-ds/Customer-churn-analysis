@@ -246,9 +246,35 @@ This mirrors how a retention team would realistically consume this finding — n
 
 ---
 
+## Step 6: Customer Segmentation (Clustering)
+
+**What:** Grouped customers into behavioral segments using K-Means clustering, based on financial and engagement features (`CreditScore`, `Age`, `Tenure`, `Balance`, `NumOfProducts`, `EstimatedSalary`, `IsActiveMember`) — deliberately excluding `Exited`, `Complain`, and `Satisfaction Score` so the segmentation describes who the customer *is*, not the outcome being studied. Churn rate was then checked within each resulting segment.
+
+**Why:** Prior steps predicted/explained churn using the churn label directly. Clustering instead finds natural customer groupings with no knowledge of who churned, which reframes the deliverable from "predict who leaves" into "here are the distinct types of customers this bank has, and here's which types are riskiest" — a persona-based framing that's often more actionable for a business than a single risk score.
+
+**How/where:** Python (`scikit-learn` — `StandardScaler`, `KMeans`), features scaled before clustering since K-Means is distance-based and would otherwise be dominated by `Balance`/`EstimatedSalary`'s large numeric ranges. Number of clusters (k=4) chosen via the elbow method — inertia drops sharply through k=4, then flattens into a much more gradual decline.
+
+### Cluster Profiles
+
+| Cluster | Size | CreditScore | Age | Tenure | Balance | NumOfProducts | Salary | Active % | Churn Rate |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 — Engaged High-Balance | 2,876 | 653 | 35.3 | 4.8 | $107,773 | 1.29 | $100,774 | 100% | **13%** |
+| 1 — Multi-Product Low-Balance | 2,761 | 650 | 35.9 | 5.1 | $9,540 | 2.13 | $99,575 | 49% | **12%** |
+| 2 — Disengaged High-Balance | 3,247 | 647 | 37.5 | 5.1 | $105,903 | 1.27 | $101,699 | 0% | **29%** |
+| 3 — Older Moderate-Balance | 1,116 | 653 | 59.9 | 4.9 | $75,892 | 1.43 | $94,920 | 83% | **36%** |
+
+### Interpretation
+
+- **Cluster 0 (Engaged High-Balance)** and **Cluster 2 (Disengaged High-Balance)** are nearly identical on balance (~$106-108K) and product count (~1.3), differing almost entirely on activity status (100% active vs 0% active) — and the churn rate more than doubles as a result (13% → 29%). This is one of the cleanest illustrations in the whole project of `IsActiveMember` as a genuine, isolated churn driver, since clustering naturally controls for the other variables here.
+- **Cluster 1 (Multi-Product Low-Balance)** has the lowest balance of any group by a wide margin (~$9.5K) but also the highest product count (2.13) and the lowest churn rate (12%) — reinforcing the Step 3/4 finding that product count, not balance, drives loyalty in this dataset.
+- **Cluster 3 (Older Moderate-Balance)** isolates the Age effect: despite reasonably high activity (83%), this older segment (average age ~60) has the highest churn rate of all four clusters (36%), confirming Age persists as a driver even when engagement is controlled for.
+
+**Business framing:** rather than a single risk score, the bank can think in terms of four personas — with **Cluster 3 (older, moderate-balance customers)** and **Cluster 2 (disengaged high-balance customers)** as the two clearest priority groups for retention outreach, for different underlying reasons (life-stage/age vs. disengagement).
+
+---
+
 ## Next Steps
 
-- **Step 6:** Customer segmentation (clustering)
 - **Step 7:** Predictive modeling (with and without leakage fields)
 - **Step 8–9:** Evaluation and explainability (SHAP)
 - **Step 10:** Business translation and risk tiering
