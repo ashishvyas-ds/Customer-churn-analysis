@@ -307,7 +307,96 @@ This mirrors how a retention team would realistically consume this finding — n
 
 ---
 
-## Next Steps
+## Step 8–9: Evaluation & Explainability
 
-- **Step 8–9:** Evaluation and explainability (SHAP)
-- **Step 10:** Business translation and risk tiering
+**What:** Extended evaluation of the realistic model beyond a single accuracy number, and used SHAP (SHapley Additive exPlanations) to understand *why* the model makes the predictions it does — both overall (which features matter most across all customers) and for individual customers.
+
+**Why:** A retention team won't act on a black-box risk score alone — they need to know *why* a customer is flagged, since that shapes what kind of outreach makes sense (a product offer vs. a loyalty call vs. a pricing discussion). SHAP also serves as an independent cross-check: if it confirms the same drivers found via EDA, statistics, and clustering, that's strong evidence the findings are real rather than an artifact of any one method.
+
+**How/where:** Python (`shap` library with `TreeExplainer` on the Random Forest realistic model)
+
+### Global Feature Importance (SHAP Summary Plot)
+
+The SHAP summary plot confirms, independently, the same drivers found throughout this project:
+
+- **Age** — the single most important feature; older customers (red) consistently pushed toward higher churn risk, younger customers (blue) toward lower risk. Matches Steps 3, 4, and 6.
+- **NumOfProducts** — second most important, and visibly non-linear: high-product-count customers (red) appear at *both* extremes of the plot rather than a clean one-directional trend, reflecting the U-shaped pattern first found in EDA (2 products safest, 3–4 products high-risk).
+- **IsActiveMember** — cleanly separated: inactive customers pushed toward higher risk, active customers toward lower risk. Matches the Cluster 0 vs. Cluster 2 comparison in Step 6.
+- **Balance, Geography, Gender** — all show a real, visible spread of influence on individual predictions, consistent with earlier findings.
+- **EstimatedSalary, CreditScore, Tenure, HasCrCard** — dots cluster tightly near zero impact for all customers, confirming these are not meaningful drivers, consistent with the Step 4 statistical tests.
+
+**This cross-method agreement (EDA → correlation → statistical tests → clustering → SHAP) is a meaningful result in itself** — the same handful of variables (Age, NumOfProducts, IsActiveMember, Balance, Geography, Gender) surface as drivers regardless of which analytical technique is used, while the same variables (Tenure, CreditScore, EstimatedSalary, HasCrCard, Card Type, Satisfaction Score) consistently wash out as noise.
+
+### Individual Prediction Example (SHAP Force Plot)
+
+For one high-risk customer correctly flagged by the model (predicted probability: 83%, vs. a 50% baseline):
+
+| Feature | Value | Effect |
+|---|---|---|
+| Age | 45 | Largest push toward risk |
+| NumOfProducts | 1 | Large push toward risk |
+| Gender | Female | Small push toward risk |
+| Balance | $0 | Small push toward risk |
+| HasCrCard | No | Small push toward risk |
+| CreditScore | 530 | Small push toward risk |
+| IsActiveMember | Yes | **Only factor reducing risk** |
+
+This is the kind of explanation a retention team member could act on directly: this customer is flagged mainly due to age and holding only one product, but remains actively engaged — suggesting a product-upgrade offer may be a more relevant intervention than assuming disengagement.
+
+---
+
+## Step 10: Business Translation & Risk Tiering
+
+**What:** Converted the model's predicted probabilities into three plain-language risk tiers (Low / Medium / High), and ran an illustrative cost-benefit calculation to translate model performance into a business decision.
+
+**Why:** This step directly answers the objective set in Step 1 — moving the bank from reactive to proactive retention. A probability score alone isn't actionable for a non-technical team; simple tiers and a cost framing are.
+
+**How/where:** Python (thresholding on existing model output; basic arithmetic for the cost-benefit estimate)
+
+### Risk Tiers
+
+| Tier | Customers | Actual Churn Rate |
+|---|---|---|
+| Low Risk (p < 0.4) | 1,440 | 7.8% |
+| Medium Risk (0.4 ≤ p < 0.7) | 347 | 35.7% |
+| High Risk (p ≥ 0.7) | 213 | **80.3%** |
+
+The tiers separate cleanly — a ~10x difference in actual churn rate between the Low and High Risk groups — indicating the model's probabilities are well-calibrated and usable as a practical prioritization tool, not just an abstract score.
+
+### Illustrative Cost-Benefit Estimate
+
+**Assumptions (illustrative only — no real financial data exists for this dataset):**
+- Retention outreach cost: $50 per customer contacted
+- Estimated annual value of a retained customer: $1,000
+- Assumed retention success rate from outreach: 30%
+
+**Applied to the High Risk tier (213 customers, 171 of whom actually churn):**
+
+| Metric | Value |
+|---|---|
+| Campaign cost (contact all 213) | $10,650 |
+| Estimated customers saved (30% of 171) | ~51 |
+| Estimated value saved | $51,300 |
+| **Net benefit** | **$40,650 (~4.8x return)** |
+
+**Important caveat:** the exact dollar figures depend entirely on the three assumptions above, which are placeholders, not real bank figures. The purpose of this calculation is to demonstrate the *framework* for turning a model into a funded business decision — a real deployment would substitute the bank's actual cost and customer-value figures into the same structure.
+
+### Final Recommendation
+
+1. **Deploy the realistic model (Step 7)** to score customers monthly, flagging the ~2% of customers who fall into the High Risk tier for immediate, prioritized retention outreach.
+2. **Prioritize by segment, not just score** — combine the risk tier with the Step 6 clusters and the Step 5 Geography × Gender finding to tailor outreach: an older, disengaged customer needs a different approach than a younger, multi-product customer with a low balance.
+3. **Do not use `Complain` or `Satisfaction Score` in the live model** — both are confirmed leakage (Steps 3, 4, 7) and only exist after a customer has already shown distress, defeating the purpose of early warning.
+4. **Track outcomes going forward** — if deployed, the assumed 30% retention success rate should be validated with an actual A/B test (contact a random half of High Risk customers, compare churn rates against the untouched half) rather than assumed indefinitely.
+
+### Limitations
+
+- Dataset is a static snapshot from Kaggle with no real business or financial context; all monetary figures in this project are illustrative.
+- The model's realistic-feature recall (59%) means a meaningful share of at-risk customers are still missed; this is disclosed rather than hidden.
+- The 3-4 product churn segment is based on a relatively small sample (326 customers) — directionally strong, but should be monitored as more data accumulates.
+- No temporal/time-series information exists in this dataset (a single snapshot), so this project cannot address *when* a customer is likely to churn, only *whether* they're at elevated risk.
+
+---
+
+## Summary
+
+This project took a public Kaggle dataset through the full analytics lifecycle: business framing, data cleaning, EDA, statistical validation, SQL analysis, unsupervised segmentation, supervised modeling (with an explicit demonstration of data leakage), explainability, and business translation. The consistent finding across every method — EDA, correlation, statistical testing, clustering, and SHAP — is that **Age, NumOfProducts, IsActiveMember, Balance, Geography, and Gender** are the real drivers of churn in this dataset, while **Tenure, CreditScore, EstimatedSalary, HasCrCard, Card Type, and Satisfaction Score** are not, despite several being assumed important at the outset. The resulting model, evaluated honestly and without leakage, offers a genuine, deployable improvement over a reactive retention process.
